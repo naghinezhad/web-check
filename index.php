@@ -3,7 +3,6 @@
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
     $domain = filter_var($_POST['domain'], FILTER_SANITIZE_STRING);
 
-    // Remove protocol (http:// or https://) and trailing slashes from the domain
     $domain = preg_replace('#^https?://#', '', rtrim($domain, '/'));
 
     // Get IP address
@@ -42,6 +41,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
     include 'get_associated_hosts.php';
     $associatedHosts = getAssociatedHosts($domain);
 
+    // Get Redirect Chain
+    include 'get_redirect_chain.php';
+    $redirectChain = getRedirectChain($domain);
+
+    // Get TXT Records
+    include 'get_txt_records.php';
+    $txtRecords = getTxtRecords($domain);
+
+    // Check Server Status
+    include 'check_server_status.php';
+    $serverStatus = checkServerStatus($domain);
+
+    // Check Open Ports
+    include 'check_open_ports.php';
+    $openPorts = checkOpenPorts($ip);
+
+    // Perform Traceroute
+    include 'traceroute.php';
+    $traceroute = traceroute($domain);
+
     // Response
     $response = [
         'ip' => $ip,
@@ -53,6 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
         'quality_metrics' => $qualityMetrics,
         'server_location' => $serverLocation,
         'associated_hosts' => $associatedHosts,
+        'redirect_chain' => $redirectChain,
+        'txt_records' => $txtRecords,
+        'server_status' => $serverStatus,
+        'open_ports' => $openPorts,
+        'traceroute' => $traceroute,
     ];
 
     header('Content-Type: application/json');

@@ -30,6 +30,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
     include 'get_headers.php';
     $headers = getHeaders($domain);
 
+    // Get Quality Metrics
+    include 'get_quality_metrics.php';
+    $qualityMetrics = getQualityMetrics($domain);
+
+    // Get Server Location
+    include 'get_server_location.php';
+    $serverLocation = getServerLocation($ip);
+
+    // Get Associated Hosts
+    include 'get_associated_hosts.php';
+    $associatedHosts = getAssociatedHosts($domain);
+
     // Response
     $response = [
         'ip' => $ip,
@@ -38,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
         'cookies' => $cookies,
         'crawl_rules' => $crawlRules,
         'headers' => $headers,
+        'quality_metrics' => $qualityMetrics,
+        'server_location' => $serverLocation,
+        'associated_hosts' => $associatedHosts,
     ];
 
     header('Content-Type: application/json');

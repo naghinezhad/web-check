@@ -1,86 +1,59 @@
 <?php
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
-    $domain = filter_var($_POST['domain'], FILTER_SANITIZE_STRING);
+require_once './function/domain_info.php';
 
+use Functions\DomainInfo;
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['domain'])) {
+    $domain = filter_var($_POST['domain'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $domain = preg_replace('#^https?://#', '', rtrim($domain, '/'));
 
-    $route = './function/';
+    try {
+        $domainInfo = new DomainInfo($domain);
 
-    // Get IP address
-    include $route . '/get_ip.php';
-    $ip = getIpFromDomain($domain);
+        $response = [
+            'ip' => $domainInfo->getIp(),
+            'ssl' => $domainInfo->getSslChain(),
+            'dns' => $domainInfo->getDnsRecords(),
+            'cookies' => $domainInfo->getCookies(),
+            'crawl_rules' => $domainInfo->getCrawlRules(),
+            'headers' => $domainInfo->getHeaders(),
+            'quality_metrics' => $domainInfo->getQualityMetrics(),
+            'server_location' => $domainInfo->getServerLocation(),
+            'associated_hosts' => $domainInfo->getAssociatedHosts(),
+            'redirect_chain' => $domainInfo->getRedirectChain(),
+            'txt_records' => $domainInfo->getTxtRecords(),
+            'server_status' => $domainInfo->getServerStatus(),
+            'open_ports' => $domainInfo->checkOpenPorts(),
+            'traceroute' => $domainInfo->traceroute(),
+            'carbon_footprint' => $domainInfo->getCarbonFootprint(),
+            'server_info' => $domainInfo->getServerInfo(),
+            'whois_lookup' => $domainInfo->getWhoisLookup(),
+            'dns_sec' => $domainInfo->getDnsSec(),
+            'site_features' => $domainInfo->getSiteFeatures(),
+        ];
 
-    // Get SSL Chain
-    include $route . 'get_ssl.php';
-    $sslInfo = getSslChain($domain);
-
-    // Get DNS Records
-    include $route . 'get_dns.php';
-    $dnsRecords = getDnsRecords($domain);
-
-    // Get Cookies
-    include $route . 'get_cookies.php';
-    $cookies = getCookies($domain);
-
-    // Get Crawl Rules
-    include $route . 'get_crawl_rules.php';
-    $crawlRules = getCrawlRules($domain);
-
-    // Get Headers
-    include $route . 'get_headers.php';
-    $headers = getHeaders($domain);
-
-    // Get Quality Metrics
-    include $route . 'get_quality_metrics.php';
-    $qualityMetrics = getQualityMetrics($domain);
-
-    // Get Server Location
-    include $route . 'get_server_location.php';
-    $serverLocation = getServerLocation($ip);
-
-    // Get Associated Hosts
-    include $route . 'get_associated_hosts.php';
-    $associatedHosts = getAssociatedHosts($domain);
-
-    // Get Redirect Chain
-    include $route . 'get_redirect_chain.php';
-    $redirectChain = getRedirectChain($domain);
-
-    // Get TXT Records
-    include $route . 'get_txt_records.php';
-    $txtRecords = getTxtRecords($domain);
-
-    // Check Server Status
-    include $route . 'check_server_status.php';
-    $serverStatus = checkServerStatus($domain);
-
-    // Check Open Ports
-    include $route . 'check_open_ports.php';
-    $openPorts = checkOpenPorts($ip);
-
-    // Perform Traceroute
-    include $route . 'traceroute.php';
-    $traceroute = traceroute($domain);
-
-    // Response
-    $response = [
-        'ip' => $ip,
-        'ssl' => $sslInfo,
-        'dns' => $dnsRecords,
-        'cookies' => $cookies,
-        'crawl_rules' => $crawlRules,
-        'headers' => $headers,
-        'quality_metrics' => $qualityMetrics,
-        'server_location' => $serverLocation,
-        'associated_hosts' => $associatedHosts,
-        'redirect_chain' => $redirectChain,
-        'txt_records' => $txtRecords,
-        'server_status' => $serverStatus,
-        'open_ports' => $openPorts,
-        'traceroute' => $traceroute,
-    ];
-
-    header('Content-Type: application/json');
-    echo json_encode($response);
+        header('Content-Type: application/json');
+        echo json_encode($response);
+    } catch (Exception $e) {
+        header('Content-Type: application/json', true, 500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+} else {
+    echo '
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Domain Info Test</title>
+    </head>
+    <body>
+        <form method="POST" action="">
+            <label for="domain">Domain:</label>
+            <input type="text" id="domain" name="domain">
+            <button type="submit">Submit</button>
+        </form>
+    </body>
+    </html>';
 }

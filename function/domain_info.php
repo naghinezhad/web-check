@@ -312,6 +312,13 @@ class DomainInfo
         return $data;
     }
 
+    public function getWhoisInfo()
+    {
+        $output = [];
+        exec("whois {$this->domain}", $output);
+        return implode("\n", $output);
+    }
+
     public function getDnsSec()
     {
         $url = "https://dnssec-analyzer.verisignlabs.com/{$this->domain}";
@@ -344,5 +351,276 @@ class DomainInfo
         }
 
         return $response;
+    }
+
+    public function checkHSTS()
+    {
+        $headers = get_headers("https://{$this->domain}", 1);
+        return isset($headers['Strict-Transport-Security']) ? $headers['Strict-Transport-Security'] : 'HSTS not enabled';
+    }
+
+    public function getDNSServer()
+    {
+        $dnsRecords = dns_get_record($this->domain, DNS_NS);
+        return $dnsRecords ? $dnsRecords : 'No DNS servers found';
+    }
+
+    public function getTechStack()
+    {
+        $apiKey = 'YOUR_WAPPALYZER_API_KEY';
+        $url = "https://api.wappalyzer.com/v2/lookup/?urls=https://{$this->domain}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            "x-api-key: $apiKey"
+        ));
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        return $response ? json_decode($response, true) : 'Unable to fetch tech stack';
+    }
+
+    public function getSitemap()
+    {
+        $sitemapUrl = "https://{$this->domain}/sitemap.xml";
+        $sitemap = @file_get_contents($sitemapUrl);
+        return $sitemap ? $sitemap : 'No sitemap found';
+    }
+
+    public function getSecurityTxt()
+    {
+        $urls = [
+            "https://{$this->domain}/.well-known/security.txt",
+            "https://{$this->domain}/security.txt"
+        ];
+
+        foreach ($urls as $url) {
+            $content = @file_get_contents($url);
+            if ($content) {
+                return $content;
+            }
+        }
+
+        return 'No security.txt file found';
+    }
+
+    public function getLinkedPages()
+    {
+        $url = "https://{$this->domain}";
+        $html = @file_get_contents($url);
+        if ($html === false) {
+            return 'Unable to fetch page';
+        }
+
+        $doc = new \DOMDocument();
+        @$doc->loadHTML($html);
+        $links = $doc->getElementsByTagName('a');
+
+        $linkedPages = [];
+        foreach ($links as $link) {
+            $href = $link->getAttribute('href');
+            if ($href) {
+                $linkedPages[] = $href;
+            }
+        }
+
+        return $linkedPages;
+    }
+
+    public function getSocialTags()
+    {
+        $url = "https://{$this->domain}";
+        $html = @file_get_contents($url);
+        if ($html === false) {
+            return 'Unable to fetch page';
+        }
+
+        $doc = new \DOMDocument();
+        @$doc->loadHTML($html);
+        $metaTags = $doc->getElementsByTagName('meta');
+
+        $socialTags = [];
+        foreach ($metaTags as $metaTag) {
+            if (
+                $metaTag->getAttribute('property') === 'og:title' ||
+                $metaTag->getAttribute('property') === 'og:description' ||
+                $metaTag->getAttribute('property') === 'og:image'
+            ) {
+                $socialTags[$metaTag->getAttribute('property')] = $metaTag->getAttribute('content');
+            }
+        }
+
+        return $socialTags;
+    }
+
+    public function getEmailConfig()
+    {
+        $dnsRecords = dns_get_record($this->domain, DNS_TXT);
+        $emailConfig = [];
+
+        foreach ($dnsRecords as $record) {
+            if (strpos($record['txt'], 'v=DMARC') !== false) {
+                $emailConfig['DMARC'] = $record['txt'];
+            }
+            if (strpos($record['txt'], 'v=spf') !== false) {
+                $emailConfig['SPF'] = $record['txt'];
+            }
+            if (strpos($record['txt'], 'k=rsa') !== false) {
+                $emailConfig['DKIM'] = $record['txt'];
+            }
+        }
+
+        return $emailConfig;
+    }
+
+    public function checkWAF()
+    {
+        $headers = get_headers("https://{$this->domain}", 1);
+        $wafHeaders = [
+            'X-Sucuri-ID', 'X-Sucuri-Cache', 'CF-Ray', 'X-Cache', 'Server'
+        ];
+
+        $wafDetected = [];
+        foreach ($wafHeaders as $header) {
+            if (isset($headers[$header])) {
+                $wafDetected[$header] = $headers[$header];
+            }
+        }
+
+        return $wafDetected ? $wafDetected : 'No WAF detected';
+    }
+
+    public function getSecurityHeaders()
+    {
+        $headers = get_headers("https://{$this->domain}", 1);
+        $securityHeaders = [
+            'Strict-Transport-Security', 'Content-Security-Policy',
+            'X-Content-Type-Options', 'X-Frame-Options', 'X-XSS-Protection'
+        ];
+
+        $detectedHeaders = [];
+        foreach ($securityHeaders as $header) {
+            if (isset($headers[$header])) {
+                $detectedHeaders[$header] = $headers[$header];
+            }
+        }
+
+        return $detectedHeaders;
+    }
+
+    public function getArchiveHistory()
+    {
+        $archiveUrl = "https://web.archive.org/web/*/{$this->domain}";
+        return $archiveUrl;
+    }
+
+    public function getGlobalRanking()
+    {
+        $url = "https://tranco-list.eu/api/rank?domain={$this->domain}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        return $response ? json_decode($response, true) : 'Unable to fetch global ranking';
+    }
+
+    public function checkBlockStatus()
+    {
+        $dnsblLists = [
+            'zen.spamhaus.org', 'b.barracudacentral.org',
+            'bl.spamcop.net', 'dnsbl.sorbs.net', 'psbl.surriel.com'
+        ];
+
+        $blockStatus = [];
+        foreach ($dnsblLists as $dnsbl) {
+            $listed = checkdnsrr("{$this->domain}.{$dnsbl}", "A");
+            $blockStatus[$dnsbl] = $listed ? 'Listed' : 'Not listed';
+        }
+
+        return $blockStatus;
+    }
+
+    public function detectMalwareAndPhishing()
+    {
+        $lists = [
+            "https://urlhaus.abuse.ch/downloads/csv/",
+            "https://data.phishtank.com/data/online-valid.csv"
+        ];
+
+        $results = [];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        foreach ($lists as $list) {
+            curl_setopt($ch, CURLOPT_URL, $list);
+            $content = curl_exec($ch);
+            if ($content === false) {
+                $results[] = "Failed to fetch data from " . $list . ": " . curl_error($ch);
+                continue;
+            }
+            if (strpos($content, $this->domain) !== false) {
+                $results[] = "Listed in " . $list;
+            }
+        }
+
+        curl_close($ch);
+
+        return $results ? $results : "No listings found.";
+    }
+
+
+    public function getTLSCipherSuites()
+    {
+        $output = [];
+        exec("nmap --script ssl-enum-ciphers -p 443 {$this->domain}", $output);
+        return implode("\n", $output);
+    }
+
+    public function checkTLSSecurityConfig()
+    {
+        $url = "https://tls-observatory.services.mozilla.com/api/v1/scan?target={$this->domain}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        return $response ? json_decode($response, true) : 'Unable to fetch TLS security config';
+    }
+
+    public function simulateTLSHandshake()
+    {
+        $url = "https://www.ssllabs.com/ssltest/analyze.html?d={$this->domain}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        return $response ? json_decode($response, true) : 'Unable to simulate TLS handshake';
+    }
+
+    public function takeScreenshot()
+    {
+        $apiKey = 'YOUR_API_KEY';
+        $url = "https://api.screenshotmachine.com?key={$apiKey}&url=https://{$this->domain}&dimension=1024x768";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $image = curl_exec($ch);
+        curl_close($ch);
+
+        $filename = 'screenshot.png';
+        file_put_contents($filename, $image);
+        return $filename;
     }
 }
